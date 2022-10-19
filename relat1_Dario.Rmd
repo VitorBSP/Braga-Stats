@@ -1,7 +1,8 @@
 ---
-title: "title"
-author: "author"
-abstract: "abstract"
+title: "Estatística e Psicologia, Apresentam:"
+subtitle: "Como duas merdas, viram uma pior"
+author: "João Pedro Guidani Braga"
+abstract: "uiui Dario"
 header-includes:
    - \usepackage[brazil]{babel}
    - \usepackage{bm}
@@ -26,10 +27,14 @@ knitr::opts_chunk$set(echo=F, message=F, warning=F, fig.pos = 'H',
 scale_fill_discrete = \(...) ggplot2::scale_fill_brewer(... , palette = "Set2") 
 library(dplyr)
 library(magrittr)
+library(tidyr)
 ```
 
 
-\section{Section name}
+# Questão 1
+
+Estimativa pontual da média:
+
 ```{r}
 masc <- readr::read_csv2('depressao_masculino.csv')
 fem <- readr::read_csv2('depressao_feminino.csv')
@@ -43,6 +48,12 @@ idade_mean = masc |> select(`F`, variavel) |>
 idade_mean = as.numeric(idade_mean[2])
 ```
 
+$\bar{X}$ = `r idade_mean`
+
+# Questão 2
+
+Estimativa intervalar:
+
 ```{r}
 idade_sd = masc |> select(`F`, variavel) |> 
   filter(variavel == 'anos') |> group_by(variavel) |> summarise(sd(`F`)) |>
@@ -51,44 +62,302 @@ idade_sd = as.numeric(idade_sd[2])
 ```
 
 ```{r}
-idade_mean + qt(0.975, 13)*idade_sd/sqrt(nrow(masc |> 
+lim_sup = idade_mean + qt(0.975, 13)*idade_sd/sqrt(nrow(masc |> 
                                                filter(variavel == 'anos')))
 
-idade_mean - qt(0.975, 13)*idade_sd/sqrt(nrow(masc |> 
+lim_inf = idade_mean - qt(0.975, 13)*idade_sd/sqrt(nrow(masc |> 
                                                filter(variavel == 'anos')))
 ```
-$$H_0: Trat_{antes} = Trat_{depois}$$
-$$H_1: Trat_{antes} < Trat_{depois}$$
-```{r}
 
-t.test(masc |> filter(variavel == 'antes') %>% .$`F`, 
+* Limite superior: `r lim_sup`
+* Limite inferior: `r lim_inf`
+
+# Questão 3 
+
+## Hipóteses
+
+$$H_0: Trat_{antes} - Trat_{depois} = 0$$
+$$H_1: Trat_{antes} - Trat_{depois} \neq 0$$
+## Teste
+
+Utilizaremos o teste t pareado, para amostras dependentes, com grau de liberdade 
+sendo 13.
+
+
+```{r}
+t1 = t.test(masc |> filter(variavel == 'antes') %>% .$`F`, 
        masc |> filter(variavel == 'depois') %>% .$`F`, 
        paired = TRUE)
 ```
 
-```{r}
-masc_antes = masc |> filter(variavel == 'antes') |> group_by(variavel) |> summarise(mean(`F`)) |> unlist()
-masc_antes = as.numeric(masc_antes[2])
-```
+Valor Crítico/Tabelado é 2,16.
 
+O Valor/Estatística calculado é:
 ```{r}
-masc_depois = masc |> filter(variavel == 'depois') |> group_by(variavel) |> summarise(mean(`F`)) |> unlist()
-masc_depois = as.numeric(masc_depois[2])
-```
-
-```{r}
-dbarra = masc_antes - masc_depois
-di =  masc |> filter(variavel == 'antes')%>%.$`F` - masc |> filter(variavel == 'depois')%>%.$`F`
-sum(di^2 - length(di)*(dbarra^2))/(length(di)-1)
+di =  masc |> filter(variavel == 'depois')%>%.$`F` - 
+        masc |> filter(variavel == 'antes')%>%.$`F`
+dbarra = mean(di)
+v = var(di)
 ```
 
 
+$$\dfrac{\bar{d}}{\sqrt{\dfrac{s^2(d)}{n}}}$$
+Onde $d$ é diferença entre as amostras e $\bar{d}$ é a diferença média. Onde
+$\bar{d}$ é `r dbarra`.
+
+
 ```{r}
-(idade_sd * qt(0.975, 13))^2 
+tcalc = sum(dbarra/sqrt(v/length(di)))
+```
+
+Assim, o valor da estatística calculada é `r tcalc` ou `t abs(tcalc)`, depende
+de como for feita a diferença entre as amostras, mas não interfere em nada, para
+efeitos estatísticos.
+
+## Decisão
+
+Utilizando o teste t pareado com nivel de significância de 5%, temos que a 
+estatística calculada é maior que a estatística tabelada, logo há evidências 
+para rejeitar a hipótese nula, e assim podemos dizer que o tratamento com 
+antidepressivos foi efetivo, dado que a média do grau de depressão foi menor
+que sem o tratamento.
+
+# Questão 4
+
+## Hipóteses
+
+$$H_0: Grau_{masc} - Grau_{fem} = 0$$
+$$H_1: Grau_{masc} - Grau_{fem} \neq 0$$
+
+## Teste
+
+Utilizaremos o teste t para diferença de médias entre amostras independentes, 
+com grau de liberdade sendo definido por:
+
+$$n^* = \dfrac{[\dfrac{s^2(x)}{n_x} + \dfrac{s^2(y)}{n_y}]^2}{\dfrac{{(\dfrac{s^2(x)}{n_x}})^2}{n_x-1} + \dfrac{{(\dfrac{s^2(y)}{n_y}})^2}{{n_y-1}}}$$
+
+```{r}
+masc_grau = masc |> filter(variavel == 'antes') %>% .$`F`
+fem_grau = fem |> filter(variavel == 'grau') %>% .$`F`
+nx = length(masc_grau)
+ny = length(fem_grau)
+varx = var(masc_grau)
+vary = var(fem_grau)
+```
+
+```{r, echo = F}
+gl_numerador = (varx/nx + vary/ny)^2
+gl_denominador = ((varx/nx)^2/(nx-1) + (vary/ny)^2/(ny-1))
+gl_numerador/gl_denominador
+```
+
+Assim temos que os graus de liberdade são `r gl_numerador/gl_denominador`.
+
+
+```{r}
+t2 = t.test(masc |> filter(variavel == 'antes') %>% .$`F`, 
+       fem |> filter(variavel == 'grau') %>% .$`F`, 
+       )
+```
+
+Valor Crítico/Tabelado é 2,06.
+
+O Valor/Estatística calculado é:
+```{r}
+mean_masc = mean(masc_grau)
+fem_masc = mean(fem_grau)
+t_denominador = sqrt(varx/nx + vary/ny)
 ```
 
 
-# Bibliography
+$$\dfrac{\bar{x} - \bar{y}}{\sqrt{\dfrac{s^2(x)}{n_x} + \dfrac{s^2(y)}{n_y}}}$$
+
+
+```{r}
+tcalc2 = (mean_masc - fem_masc)/t_denominador
+```
+
+Assim, o valor da estatística calculada é `r tcalc2`.
+
+## Decisão
+
+Utilizando o teste t para amostras independentes com nivel de significância de 
+5%, temos que a estatística calculada é maior que a estatística tabelada, 
+logo há evidências para rejeitar a hipótese nula, e sabendo que a média do grau 
+de depressão masculino é `mean_masc` e feminino é `r fem_masc` assim podemos 
+dizer que o grau de depressão é maior nos homens.
+
+
+# Questão 5
+
+
+## Hipóteses
+
+$$H_0: Proporção{masc} = Proporção_{fem} $$
+$$H_1: Proporção_{masc} \neq Proporção_{fem}$$
+
+## Teste
+
+Utilizaremos o teste Z para duas proporções.
+
+Precisaremos incialmente calcular $\hat{p_1}$ e $\hat{p_2}$.
+
+$$\hat{p_1} \sim (p_1, \dfrac{p_1(1 - p_1)}{n_1})$$
+$$\hat{p_2} \sim (p_2, \dfrac{p_2(1 - p_2)}{n_2})$$
+
+O $\hat{p}$ é:
+
+$$\hat{p} = \dfrac{n_1\hat{p_1} + n_2\hat{p_2}}{n_1 + n_2}$$
+
+
+```{r}
+n_levemod_masc = masc %>% mutate(q5 = ifelse(`F` > 9 & `F` <19, 'levemod', 'uepa')) %>%
+  filter(variavel == 'antes' & q5 ==  'levemod') %>% 
+  nrow()
+
+n_levemod_fem = fem %>% mutate(q5 = ifelse(`F` > 9 & `F` <19, 'levemod', 'uepa')) %>%
+  filter(variavel == 'grau' & q5 ==  'levemod') %>% 
+  nrow()
+p1 = n_levemod_masc/nx
+p2 = n_levemod_fem/ny
+```
+
+```{r}
+table = matrix(c(4,10,14,5), byrow = T, nrow = 2)
+t3 = prop.test(table)
+```
+
+
+
+Valor Crítico/Tabelado é 1,96.
+
+O Valor/Estatística calculado é:
+
+
+$$Z = \dfrac{\hat{p_1} - \hat{p_2}}{\sqrt{\dfrac{p_1(1 - p_1)}{n_1}} + \dfrac{p_2(1 - p_2)}{n_2}}$$
+
+
+
+
+Assim, o valor da estatística calculada é `r t3$statistic`.
+
+## Decisão
+
+Utilizando o teste Z para proporções com nivel de significância de 
+5%, temos que a estatística calculada é maior que a estatística tabelada, 
+logo há evidências para rejeitar a hipótese nula, e sabendo que a proporção de 
+homens com depressão leve à moderada é `mean_masc` e mulheres é `r fem_masc`, 
+assim podemos dizer que o grau de depressão leve à moderada é mais preponderante
+nas mulheres.
+
+# Questão 6
+
+Como não ficou bem definido qual o grupo para ser utilizado como amostra piloto,
+utilizarei 3:
+
+* Homens;
+* Mulheres;
+* Homens + Mulheres;
+
+E duas situações, utilizando como margem de erro 0.5 e 1 ano:
+
+```{r}
+sd1 = function(sd, n) (sd*qt(0.975, n-1))^2
+sd2 = function(sd, n) (2*sd*qt(0.975, n-1))^2
+homens_sd = masc |> select(`F`, variavel) |> 
+  filter(variavel == 'anos') %>% .$`F` %>% sd()
+mulheres_sd = fem |> select(`F`, variavel) |> 
+  filter(variavel == 'anos') %>% .$`F` %>% sd()
+homens_amostra_1 = sd1(homens_sd, nrow(masc |> filter(variavel == 'anos')))
+homens_amostra_2 = sd2(homens_sd, nrow(masc |> filter(variavel == 'anos')))
+
+mulheres_amostra_1 = sd1(mulheres_sd, nrow(fem |> filter(variavel == 'anos')))
+mulheres_amostra_2 = sd2(mulheres_sd, nrow(fem |> filter(variavel == 'anos')))
+
+
+junto_sd  = masc |> select(`F`, variavel) |> 
+  filter(variavel == 'anos') |>
+  bind_rows(fem |> select(`F`, variavel) |> 
+  filter(variavel == 'anos')) %>% .$`F` %>% sd()
+
+
+n_junto = nrow(masc |> select(`F`, variavel) |> 
+  filter(variavel == 'anos') |>
+  bind_rows(fem |> select(`F`, variavel) |> 
+  filter(variavel == 'anos')))
+
+juntos_amostra_1 = sd1(junto_sd, n_junto)
+juntos_amostra_2 = sd2(junto_sd, n_junto)
+
+```
+
+Temos que as amostras necessárias para construir intervalos com menos de 1 de 
+margem de erro para os grupos de mulheres, homens e homens e mulheres juntos 
+são: `r ceiling(homens_amostra_1)`, `r ceiling(mulheres_amostra_1)` e 
+`r ceiling(juntos_amostra_1)`, o qão podemos ver que tem um acréscimo no número
+da amostra para o grupo masculino, indicando ser o mais heterogêneo, pois 
+é o único que precisa diminuir a margem de erro do intervalo, nesse caso.
+
+No entanto considerando, a margem de erro como 0.5, tem-se: 
+`r ceiling(homens_amostra_2)`, `r ceiling(mulheres_amostra_2)` e 
+`r ceiling(juntos_amostra_2)`, respectivamente. Assim notamos um aumento 
+consideravel para a amostra de todos.
+
+
+# Questão 7
+
+
+## Hipóteses
+
+$$H_0: \hbox{Não há associação entre sexo e o grau de depressão.}$$
+$$H_1: \hbox{Há associação entre sexo e o grau de depressão.}$$
+
+## Teste
+
+Utilizaremos o teste qui-quadrado para verifcação de associação entre variáveis para duas proporções.
+
+**FODA-SE AS FÓRMULAS I'M TIRED MAN**
+
+```{r}
+depressao = masc |> select(`F`, variavel) |> 
+  filter(variavel == 'antes') |>
+  bind_rows(fem |> select(`F`, variavel) |> 
+  filter(variavel == 'grau')) |>
+  mutate(sexo = rep(c('homem', 'mulher'), 
+                    c(nrow(masc |> filter(variavel == 'antes')), 
+                      nrow(fem |> filter(variavel == 'grau')))),
+         classe_depressao = case_when(`F` < 10 ~ 'Sem depressão',
+                                      `F` < 19 ~ 'Depressão Leve',
+                                      `F` < 30 ~ 'Depressão Moderada',
+                                      TRUE ~ 'Depressão grave'))
+```
+
+```{r tab1}
+tab=function(df,v1,v2){
+ df %>% 
+      group_by({{v1}},{{v2}}) %>%  
+      summarise(n=n())   %>%  
+      spread({{v2}}, n) %>% 
+      ungroup() %>% 
+      mutate_if(is.numeric , replace_na, replace = 0) 
+}
+tab1 = tab(depressao, sexo, classe_depressao)
+
+t4 = chisq.test(tab1[,2:4])
+```
+
+
+Valor Crítico/Tabelado, com 2 graus de liberdade é 5,991.
+
+O Valor/Estatística calculado é: `r t4$statistic`.
+
+## Decisão
+
+Utilizando o teste qui-quadrado para associações com nivel de significância de 
+5%, temos que a estatística calculada é maior que a estatística tabelada, 
+logo há evidências para rejeitar a hipótese nula, assim como já indicam os testes
+anteriores, agora podemos afirmar que há associação entre o sexo e o grau de 
+depressão.
 
 
 
